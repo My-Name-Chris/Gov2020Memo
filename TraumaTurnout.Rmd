@@ -1,0 +1,1817 @@
+---
+title: "Trauma /& Turnout: The Political Consequences of Traumatic Events"
+author: "Wayde Z.C. Marsh"
+date: "06/05/22"
+output:
+  html_document:
+    toc: true
+    code_folding: hide
+  latex_engine: xelatex
+  number_sections: yes
+mainfont: Helvetica
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Setting up the Data {.tabset}
+
+## Loading packages and data
+
+```{r setup, message = FALSE, warning = FALSE, results ='hide'}
+
+##### Packages #####
+
+library(arm)
+library(boot)
+library(descr)
+library(ggplot2)
+library(psych)
+library(GPArotation)
+#library(apsrtable)
+library(dplyr)
+library(RPMG)
+library(foreign)
+library(plyr)
+library(ggpubr)
+library(ggeffects)
+library(data.table)
+library(lubridate)
+library(haven)
+library(panelView)
+library(plm)
+library(multiwayvcov) 
+library(lmtest)
+library(wfe)
+library(PanelMatch)
+library(DataCombine)
+#library(Zelig)
+library(Amelia)
+library(mi)
+library(stringr)
+library(lfe)
+library(clubSandwich)
+library(reghelper)
+
+#setwd("[file path to folder where saved files]") # set working directory
+#knitr::opts_knit$set(root.dir = '[file path to folder where saved files]')
+
+```
+
+# Load data
+
+```{r}
+
+load('cps.Rda') # individual-level CPS data
+load('cps_lag.Rda') # individual-level CPS data w/ one lag
+load('cps_2lag.Rda') # individual-level CPS data w/ two lags
+load('discop.Rda') # county-level data
+load('stanrob.Rda') # Stanford Mass Shootings data for robustness check
+
+# refer to "cps.Rda" as cps3 in code
+# refer to "cps_lag.Rda" as cps_lag in code
+# refer to "cps_2lag.Rda" as cps_2lag in code
+# refer to "discop.Rda" as discop in code
+# refer to "stanrob.Rda" as stan2 in code
+
+```
+
+# County-Level Analysis
+
+## Descriptive Comparisons--Violin Plots
+
+```{r}
+
+data_summary <- function(x) { # summary stats function
+   m <- mean(x)
+   ymin <- m-sd(x)
+   ymax <- m+sd(x)
+   return(c(y=m,ymin=ymin,ymax=ymax))
+}
+
+p1 <- ggplot(discop, aes(x = as.factor(tr_ar), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of Arson Attack against Black Church') +
+  scale_x_discrete(labels = c('No Arson Attack', 'Arson Attack')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p2 <- ggplot(discop, aes(x = as.factor(tr_dis), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of FEMA Disaster') +
+  scale_x_discrete(labels = c('No Disaster', 'Disaster')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p3 <- ggplot(discop, aes(x = as.factor(tr_sh), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of Mass Shooting') +
+  scale_x_discrete(labels = c('No Mass Shooting', 'Mass Shooting')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p4 <- ggplot(discop, aes(x = as.factor(dis_hurricane), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of Hurricane') +
+  scale_x_discrete(labels = c('No Hurricane', 'Hurricane')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p5 <- ggplot(discop, aes(x = as.factor(dis_terror), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of Terrorism') +
+  scale_x_discrete(labels = c('No Terrorist Attack', 'Terrorist Attack')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p6 <- ggplot(discop, aes(x = as.factor(tr_dis2), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of Natural Disaster') +
+  scale_x_discrete(labels = c('No Natural Disaster', 'Natural Disaster')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p7 <- ggplot(discop, aes(x = as.factor(tr_dis3), y = turnout)) +
+  geom_violin(trim = F, fill = '#A4A4A4', color = 'black') +
+  theme_bw() +
+  theme(text=element_text(family="serif")) +
+  ylab('Turnout') + xlab('Occurrence of Anthropogenic Disaster') +
+  scale_x_discrete(labels = c('No Anthropogenic Disaster', 'Anthropogenic Disaster')) +
+  labs(title = "Average County-Year Turnout, 1976-2016") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  stat_summary(fun.data=data_summary)
+
+p1; p2; p3; p4; p5; p6; p7
+
+```
+
+## Generalized Two-way FEs Analysis
+
+```{r}
+
+library(clubSandwich)
+
+# arson
+
+art_plm1 <- plm(turnout ~ tr_ar + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(art_plm1, vcov = vcovHC(art_plm1, cluster = 'group')) 
+
+# shooting
+
+sht_plm1 <- plm(turnout ~ tr_sh + perc_bl + pop_tot + income +
+                  fatalities + injured, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(sht_plm1, vcov = vcovHC(sht_plm1, cluster = 'group'))
+
+# natural disasters
+
+dist_plm2 <- plm(turnout ~ tr_dis2 + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(dist_plm2, vcov = vcovHC(dist_plm2, cluster = 'group'))
+
+## Testing for contamination across events
+
+xc_plm1 <- plm(turnout ~ tr_ar + tr_sh + tr_dis2 +
+                 perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(xc_plm1, vcov = vcovHC(xc_plm1, cluster = 'group'))
+
+#### w/ Standardized Coefficients
+
+discop_s <- 
+  discop %>% 
+  mutate(turnout_s = scale(turnout),
+           tr_ar_s = scale(tr_ar),
+           tr_sh_s = scale(tr_sh),
+           tr_dis2_s = scale(tr_dis2),
+           perc_bl_s = scale(perc_bl),
+           pop_tot_s = scale(pop_tot),
+           income_s = scale(income),
+           fatalities_s = scale(fatalities),
+           injured_s = scale(injured))
+
+art_plm1_s <- plm(turnout_s ~ tr_ar_s + perc_bl_s + pop_tot_s + income_s, # with controls
+           data = discop_s,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(art_plm1_s, vcov = vcovHC(art_plm1_s, cluster = 'group')) 
+
+sht_plm1_s <- plm(turnout_s ~ tr_sh_s + perc_bl_s + pop_tot_s + income_s +
+                  fatalities_s + injured_s, # with controls
+           data = discop_s,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(sht_plm1_s, vcov = vcovHC(sht_plm1_s, cluster = 'group'))
+
+dist_plm2_s <- plm(turnout_s ~ tr_dis2_s + perc_bl_s + pop_tot_s + income_s, # w/ controls
+           data = discop_s,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(dist_plm2_s, vcov = vcovHC(dist_plm2_s, cluster = 'group'))
+
+```
+
+## Weighted Fixed Effects Analysis
+
+```{r}
+
+ar_wfe <- wfe(turnout ~ tr_ar + perc_bl + pop_tot + income, 
+           data = discop,
+           treat = 'tr_ar',
+           unit.index = 'fips',
+           time.index = 'year', 
+           qoi = 'att')
+summary(ar_wfe)
+
+sh_wfe <- wfe(turnout ~ tr_sh + perc_bl + pop_tot + income + fatalities + injured,
+           data = discop,
+           treat = 'tr_sh',
+           unit.index = 'fips',
+           time.index = 'year',
+           qoi = 'att')
+summary(sh_wfe)
+
+nat_wfe <- wfe(turnout ~ tr_dis2 + perc_bl + pop_tot + income, 
+           data = discop,
+           treat = 'tr_dis2',
+           unit.index = 'fips',
+           time.index = 'year',
+           qoi = 'att')
+summary(nat_wfe)
+
+```
+
+## Lagged DV Analysis
+
+```{r}
+
+# create lagged data frame
+
+discop$cum_ar <- ifelse(is.na(discop$cum_ar), 0, discop$cum_ar) 
+discop$cum_sh <- ifelse(is.na(discop$cum_sh), 0, discop$cum_sh) 
+discop$cum_dis <- ifelse(is.na(discop$cum_dis), 0, discop$cum_dis) 
+
+disco_lag <- DataCombine::slide(discop, Var = "turnout", GroupVar = "fips",
+                             slideBy = -1, NewVar = "turnout_l1", reminder = FALSE)
+
+disco_2lag <- DataCombine::slide(disco_lag, Var = "turnout_l1", GroupVar = "fips",
+                             slideBy = -1, NewVar = "turnout_l2", reminder = FALSE)
+
+# arson
+
+ar_lag1 <- lm(turnout ~ turnout_l1 + tr_ar,
+              data = disco_lag)
+
+summary(ar_lag1) # ~4.6% decrease is turnout when arson attack present
+coeftest(ar_lag1, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_lag1 <- lm(turnout ~ turnout_l1 + tr_sh +
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag1) # ~0.5% decrease is turnout when mass shooting present (not sig.)
+coeftest(sh_lag1, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+nat_lag1 <- lm(turnout ~ turnout_l1 + tr_dis2,
+              data = disco_lag)
+
+summary(nat_lag1) # ~0.5% decrease in turnout when natural disaster occurs
+natl <- coeftest(nat_lag1, vcov = vcovHC, type = 'HC1')
+
+## with cumulative variable
+# arson
+
+ar_lag0 <- lm(turnout ~ turnout_l1 + tr_ar + cum_ar,
+              data = disco_lag)
+
+summary(ar_lag0) # ~4.6% decrease is turnout when arson attack present
+coeftest(ar_lag0, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_lag0 <- lm(turnout ~ turnout_l1 + tr_sh + cum_sh +
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag0) # ~0.5% decrease is turnout when mass shooting present (not sig.)
+coeftest(sh_lag0, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+nat_lag0 <- lm(turnout ~ turnout_l1 + tr_dis2 + cum_dis,
+              data = disco_lag)
+
+summary(nat_lag0) # ~0.5% decrease in turnout when natural disaster occurs
+coeftest(nat_lag0, vcov = vcovHC, type = 'HC1')
+
+
+## With controls
+
+# arson
+
+ar_lag2 <- lm(turnout ~ turnout_l1 + tr_ar +
+                perc_bl + pop_tot + income,
+              data = disco_lag)
+
+summary(ar_lag2) 
+coeftest(ar_lag2, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_lag2 <- lm(turnout ~ turnout_l1 + tr_sh +
+                perc_bl + pop_tot + income + 
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag2) 
+coeftest(sh_lag2, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+nat_lag2 <- lm(turnout ~ turnout_l1 + tr_dis2 + 
+                perc_bl + pop_tot + income,
+              data = disco_lag)
+
+summary(nat_lag2) 
+coeftest(nat_lag2, vcov = vcovHC, type = 'HC1')
+
+### With controls and two lags
+
+# arson
+
+ar_lag3 <- lm(turnout ~ turnout_l1 + turnout_l2 + tr_ar +
+                perc_bl + pop_tot + income,
+              data = disco_2lag)
+
+summary(ar_lag3) 
+coeftest(ar_lag3, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_lag3 <- lm(turnout ~ turnout_l1 + turnout_l2 + tr_sh +
+                perc_bl + pop_tot + income + 
+                fatalities + injured,
+              data = disco_2lag)
+
+summary(sh_lag3) 
+coeftest(sh_lag3, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+nat_lag3 <- lm(turnout ~ turnout_l1 + turnout_l2 + tr_dis2 +
+                 perc_bl + pop_tot + income,
+              data = disco_2lag)
+
+summary(nat_lag3) 
+coeftest(nat_lag3, vcov = vcovHC, type = 'HC1')
+
+### With controls and just cumulative variable and two lags
+
+# arson
+
+ar_lag4 <- lm(turnout ~ turnout_l1 + turnout_l2 + cum_ar +
+                perc_bl + pop_tot + income,
+              data = disco_2lag)
+
+summary(ar_lag4) 
+coeftest(ar_lag4, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_lag4 <- lm(turnout ~ turnout_l1 + turnout_l2 + cum_sh +
+                perc_bl + pop_tot + income + 
+                fatalities + injured,
+              data = disco_2lag)
+
+summary(sh_lag4) 
+coeftest(sh_lag4, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+nat_lag4 <- lm(turnout ~ turnout_l1 + turnout_l2 + cum_dis +
+                 perc_bl + pop_tot + income,
+              data = disco_2lag)
+
+summary(nat_lag4) 
+coeftest(nat_lag4, vcov = vcovHC, type = 'HC1')
+
+```
+
+## Adding Time Trend
+
+```{r}
+
+# ## adding a time trend variable
+# art_lm1 <- lm(turnout ~ tr_ar + perc_bl + pop_tot + income + as.factor(year) + as.factor(fips)*year,
+#               data = discop)
+# summary(art_lm1)
+# 
+# ## adding a time trend variable
+# sh_lm1 <- lm(turnout ~ tr_sh + perc_bl + pop_tot + income + fatalities + injured + 
+#                as.factor(year) + as.factor(fips)*year,
+#               data = discop)
+# summary(sh_lm1)
+# 
+# ## adding a time trend variable
+# dis_lm1 <- lm(turnout ~ tr_dis2 + perc_bl + pop_tot + income + 
+#                as.factor(year) + as.factor(fips)*year,
+#               data = discop)
+# summary(dis_lm1)
+
+```
+
+# Effect of Temporal Proximity
+
+## Two-Way Fixed Effects Models
+
+```{r}
+
+# arson
+
+art_plm_3m <- plm(turnout ~ el3m_ar + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+ar_3m <- coeftest(art_plm_3m, vcov = vcovHC(art_plm_3m, type = 'sss', cluster = 'group')) # 1.5% decrease in turnout; n = 23
+
+art_plm_6m <- plm(turnout ~ el6m_ar + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+ar_6m <- coeftest(art_plm_6m, vcov = vcovHC(art_plm_6m, type = 'sss', cluster = 'group')) # 0.7% decrease in turnout, not sig.; n = 47
+
+art_plm_yr <- plm(turnout ~ elyr_ar + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+ar_yr <- coeftest(art_plm_yr, vcov = vcovHC(art_plm_yr, type = 'sss', cluster = 'group')) # 0.9% decrease in turnout; n = 64
+
+art_plm_2yr <- plm(turnout ~ el2_ar + perc_bl + pop_tot + income, # without arrest control b/c causes a MC problem
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+ar_2yr <- coeftest(art_plm_2yr, vcov = vcovHC(art_plm_2yr, type = 'sss', cluster = 'group')) # 1.1% decrease in turnout; n = 110
+
+# shooting
+
+sht_plm_3m <- plm(turnout ~ el3m_sh + perc_bl + pop_tot + income +
+                  fatalities + injured, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+sh_3m <- coeftest(sht_plm_3m, vcov = vcovHC(sht_plm_3m, type = 'sss', cluster = 'group')) # ~3.4% increase in turnout, not sig.; n = 3
+
+sht_plm_6m <- plm(turnout ~ el6m_sh + perc_bl + pop_tot + income +
+                  fatalities + injured, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+sh_6m <- coeftest(sht_plm_6m, vcov = vcovHC(sht_plm_6m, type = 'sss', cluster = 'group')) # ~5.5% increase in turnout; n = 10
+
+sht_plm_yr <- plm(turnout ~ elyr_sh + perc_bl + pop_tot + income +
+                  fatalities + injured, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+sh_yr <- coeftest(sht_plm_yr, vcov = vcovHC(sht_plm_yr, type = 'sss', cluster = 'group')) # ~2.5% increase in turnout; n = 17
+
+sht_plm_2yr <- plm(turnout ~ el2_sh + perc_bl + pop_tot + income +
+                  fatalities + injured, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+sh_2yr <- coeftest(sht_plm_2yr, vcov = vcovHC(sht_plm_2yr, type = 'sss', cluster = 'group')) # ~6.1% increase in turnout, not sig.; n = 32
+
+# natural disaster
+
+dist_plm2_3m <- plm(turnout ~ el3m_dis2 + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+nat_3m <- coeftest(dist_plm2_3m, vcov = vcovHC(dist_plm2_3m, cluster = 'group')) # 1.7% increase in turnout; n = 476
+
+dist_plm2_6m <- plm(turnout ~ el6m_dis2 + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+nat_6m <- coeftest(dist_plm2_6m, vcov = vcovHC(dist_plm2_6m, cluster = 'group')) # 0.4% increase in turnout; n = 708
+
+dist_plm2_yr <- plm(turnout ~ elyr_dis2 + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+nat_yr <- coeftest(dist_plm2_yr, vcov = vcovHC(dist_plm2_yr, cluster = 'group')) # 0.3% increase in turnout; n = 1298
+
+dist_plm2_2yr <- plm(turnout ~ el2_dis2 + perc_bl + pop_tot + income, # with controls
+           data = discop,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+nat_2yr <- coeftest(dist_plm2_2yr, vcov = vcovHC(dist_plm2_2yr, cluster = 'group')) # 0.2% increase in turnout, not.sig; n = 2913
+
+```
+
+## Lagged DV Models
+
+```{r}
+
+# arson
+
+ar_lag_3m <- lm(turnout ~ turnout_l1 + el3m_ar,
+              data = disco_lag)
+
+summary(ar_lag_3m) # ~6.5% decrease is turnout when arson attack present
+arl_3m <- coeftest(ar_lag_3m, vcov = vcovHC, type = 'HC1')
+
+ar_lag_6m <- lm(turnout ~ turnout_l1 + el6m_ar,
+              data = disco_lag)
+
+summary(ar_lag_6m) # ~6.6% decrease is turnout when arson attack present
+arl_6m <- coeftest(ar_lag_6m, vcov = vcovHC, type = 'HC1')
+
+ar_lag_yr <- lm(turnout ~ turnout_l1 + elyr_ar,
+              data = disco_lag)
+
+summary(ar_lag_yr) # ~6.7% decrease is turnout when arson attack present
+arl_yr <- coeftest(ar_lag_yr, vcov = vcovHC, type = 'HC1')
+
+ar_lag_2yr <- lm(turnout ~ turnout_l1 + el2_ar,
+              data = disco_lag)
+
+summary(ar_lag_2yr) # ~6.1% decrease is turnout when arson attack present
+arl_2yr <- coeftest(ar_lag_2yr, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_lag_3m <- lm(turnout ~ turnout_l1 + el3m_sh +
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag_3m) # ~4.9% increase is turnout when mass shooting present
+shl_3m <- coeftest(sh_lag_3m, vcov = vcovHC, type = 'HC1')
+
+sh_lag_6m <- lm(turnout ~ turnout_l1 + el6m_sh +
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag_6m) # ~4.1% increase is turnout when mass shooting present 
+shl_6m <- coeftest(sh_lag_6m, vcov = vcovHC, type = 'HC1')
+
+sh_lag_yr <- lm(turnout ~ turnout_l1 + elyr_sh +
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag_yr) # ~1.2% increase is turnout when mass shooting present (not sig.)
+shl_yr <- coeftest(sh_lag_yr, vcov = vcovHC, type = 'HC1')
+
+sh_lag_2yr <- lm(turnout ~ turnout_l1 + el2_sh +
+                fatalities + injured,
+              data = disco_lag)
+
+summary(sh_lag_2yr) # ~1.0% decrease is turnout when mass shooting present (not sig.)
+shl_2yr <- coeftest(sh_lag_2yr, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+nat_lag_3m <- lm(turnout ~ turnout_l1 + el3m_dis2,
+              data = disco_lag)
+
+summary(nat_lag_3m) # ~1.6% increase is turnout when natural disaster occurs
+natl_3m <- coeftest(nat_lag_3m, vcov = vcovHC, type = 'HC1')
+
+nat_lag_6m <- lm(turnout ~ turnout_l1 + el6m_dis2,
+              data = disco_lag)
+
+summary(nat_lag_6m) # ~0.7% increase in turnout when natural disaster occurs
+natl_6m <- coeftest(nat_lag_6m, vcov = vcovHC, type = 'HC1')
+
+nat_lag_yr <- lm(turnout ~ turnout_l1 + elyr_dis2,
+              data = disco_lag)
+
+summary(nat_lag_yr) # ~1.6% decrease in turnout when natural disaster occurs
+natl_yr <- coeftest(nat_lag_yr, vcov = vcovHC, type = 'HC1')
+
+nat_lag_2yr <- lm(turnout ~ turnout_l1 + el2_dis2,
+              data = disco_lag)
+
+summary(nat_lag_2yr) # ~1.0% decrease in turnout when natural disaster occurs
+natl_2yr <- coeftest(nat_lag_2yr, vcov = vcovHC, type = 'HC1')
+
+```
+
+## Figures
+
+```{r}
+
+type <- c(rep('Arson', 4), rep('Mass Shooting', 4), rep('Natural Disasters', 4))
+time <- rep(c('aThree Months', 'bSix Months', 'cElection Year', 'dTwo Years'), 3)
+
+did <- as.data.frame(cbind(type, time))
+did$coef <- c(ar_3m[[1]], ar_6m[[1]], ar_yr[[1]], ar_2yr[[1]],
+              sh_3m[[1]], sh_6m[[1]], sh_yr[[1]], sh_2yr[[1]],
+              nat_3m[[1]], nat_6m[[1]], nat_yr[[1]], nat_2yr[[1]])
+did$lo <- c(ar_3m[[1]] - ar_3m[[5]], ar_6m[[1]] - ar_6m[[5]],
+               ar_yr[[1]] - ar_yr[[5]], ar_2yr[[1]] - ar_2yr[[5]],
+            sh_3m[[1]] - sh_3m[[7]], sh_6m[[1]] - sh_6m[[7]],
+               sh_yr[[1]] - sh_yr[[7]], sh_2yr[[1]] - sh_2yr[[7]],
+            nat_3m[[1]] - nat_3m[[5]], nat_6m[[1]] - nat_6m[[5]],
+               nat_yr[[1]] - nat_yr[[5]], nat_2yr[[1]] - nat_2yr[[5]])
+did$hi <- c(ar_3m[[1]] + ar_3m[[5]], ar_6m[[1]] + ar_6m[[5]],
+               ar_yr[[1]] + ar_yr[[5]], ar_2yr[[1]] + ar_2yr[[5]],
+            sh_3m[[1]] + sh_3m[[7]], sh_6m[[1]] + sh_6m[[7]],
+               sh_yr[[1]] + sh_yr[[7]], sh_2yr[[1]] + sh_2yr[[7]],
+            nat_3m[[1]] + nat_3m[[5]], nat_6m[[1]] + nat_6m[[5]],
+               nat_yr[[1]] + nat_yr[[5]], nat_2yr[[1]] + nat_2yr[[5]])
+
+did_p <- ggplot(did, aes(shape = type)) +
+      theme_bw() +
+      geom_hline(yintercept = 0, colour = gray(1/2), lty = 2) +
+      geom_pointrange(aes(x = time, y = coef*100, ymin = lo*100,
+                         ymax = hi*100, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+    scale_x_discrete(labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+    scale_shape_manual(name = 'Event Type', labels = c('Arson', 'Mass Shooting', 'Natural Disasters'), values=c(21, 22, 23)) +
+    # scale_colour_manual(name = 'Event Type', labels = c('Arson', 'Mass Shooting', 'Natural Disasters'), values = c('orangered4', 'seagreen4', 'royalblue4')) +
+    ylim(-8, 7.5) + ylab('Percentage Point Change in Turnout') + xlab('') +
+  labs(caption = '\nNote: The plot presents the percentage point change in the estimated turnout for counties that experienced a Black Church arson, mass shooting, or \nnatural disaster by the temporal proximity of the event to the the next presidential election, using the county-level data. Point estimates are the coefficient \nestimates from a two-way fixed effects model and error bars respresent 95% confidence intervals. Full results in tables, 30, 31, and 32 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+    theme(axis.text=element_text(size = 12)) + 
+    theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+
+lag.df <- as.data.frame(cbind(type, time))
+lag.df$coef <- c(arl_3m[[3]], arl_6m[[3]], arl_yr[[3]], arl_2yr[[3]],
+              shl_3m[[3]], shl_6m[[3]], shl_yr[[3]], shl_2yr[[3]],
+              natl_3m[[3]], natl_6m[[3]], natl_yr[[3]], natl_2yr[[3]])
+lag.df$lo <- c(arl_3m[[3]] - arl_3m[[6]], arl_6m[[3]] - arl_6m[[6]],
+               arl_yr[[3]] - arl_yr[[6]], arl_2yr[[3]] - arl_2yr[[6]],
+            shl_3m[[3]] - shl_3m[[8]], shl_6m[[3]] - shl_6m[[8]],
+               shl_yr[[3]] - shl_yr[[8]], shl_2yr[[3]] - shl_2yr[[8]],
+            natl_3m[[3]] - natl_3m[[6]], natl_6m[[3]] - natl_6m[[6]],
+               natl_yr[[3]] - natl_yr[[6]], natl_2yr[[3]] - natl_2yr[[6]])
+lag.df$hi <- c(arl_3m[[3]] + arl_3m[[6]], arl_6m[[3]] + arl_6m[[6]],
+               arl_yr[[3]] + arl_yr[[6]], arl_2yr[[3]] + arl_2yr[[6]],
+            shl_3m[[3]] + shl_3m[[8]], shl_6m[[3]] + shl_6m[[8]],
+               shl_yr[[3]] + shl_yr[[8]], shl_2yr[[3]] + shl_2yr[[8]],
+            natl_3m[[3]] + natl_3m[[6]], natl_6m[[3]] + natl_6m[[6]],
+               natl_yr[[3]] + natl_yr[[6]], natl_2yr[[3]] + natl_2yr[[6]])
+
+lag_p <- ggplot(lag.df, aes(shape = type)) +
+      theme_bw() +
+      geom_hline(yintercept = 0, colour = gray(1/2), lty = 2) +
+      geom_pointrange(aes(x = time, y = coef*100, ymin = lo*100,
+                         ymax = hi*100, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+    scale_x_discrete(labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+    scale_shape_manual(name = 'Event Type', labels = c('Arson', 'Mass Shooting', 'Natural Disasters'), values=c(21, 22, 23)) +
+    # scale_colour_manual(name = 'Event Type', labels = c('Arson', 'Mass Shooting', 'Natural Disasters'), values = c('orangered4', 'seagreen4', 'royalblue4')) +
+    ylim(-8, 7.7) + ylab('Percentage Point Change in Turnout') + xlab('') +
+  labs(caption = '\nNote: The plot presents the percentage point change in the estimated turnout for counties that experienced a Black Church arson, mass shooting, or \nnatural disaster by the temporal proximity of the event to the the next presidential election, using the county-level data. Point estimates are the coefficient \nestimates from a lagged dependent variable model and error bars respresent 95% confidence intervals. Full results in tables, 33, 34, and 35 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+    theme(axis.text=element_text(size = 12)) + 
+    theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+did_p; lag_p
+
+```
+
+# Panel Matching Analysis
+
+```{r}
+
+disco_lag$year2 <- ifelse(disco_lag$year == 1976, 1976,
+                  ifelse(disco_lag$year == 1980, 1977,
+                  ifelse(disco_lag$year == 1984, 1978,
+                  ifelse(disco_lag$year == 1988, 1979,
+                  ifelse(disco_lag$year == 1992, 1980,
+                  ifelse(disco_lag$year == 1996, 1981,
+                  ifelse(disco_lag$year == 2000, 1982,
+                  ifelse(disco_lag$year == 2004, 1983,
+                  ifelse(disco_lag$year == 2008, 1984,
+                  ifelse(disco_lag$year == 2012, 1985, 1986))))))))))
+disco_lag$year2 <- as.integer(disco_lag$year2)
+
+# DisplayTreatment(unit.id = 'fips',
+#                  time.id = 'year2',
+#                  legend.position = 'bottom',
+#                  xlab = 'Year', ylab = 'County Code',
+#                  treatment = 'tr_dis', data = disco_lag,
+#                  #hide.x.axis.label = TRUE, hide.y.axis.label = TRUE, 
+#                  dense.plot = TRUE)
+```
+
+```{r}
+
+PM.results_arnone <- PanelMatch(lag = 5, time.id = "year2", unit.id = "fips", 
+                         treatment = "tr_ar", refinement.method = "none", # use no refinement
+                         data = disco_lag, match.missing = TRUE, 
+                         covs.formula = ~ turnout_l1 + perc_bl + pop_tot + income, 
+                         size.match = 5, qoi = "att" , outcome.var = "turnout",
+                         lead = 0:4, forbid.treatment.reversal = FALSE, 
+                         use.diagonal.variance.matrix = TRUE)
+
+PM.results_ar <- PanelMatch(lag = 5, time.id = "year2", unit.id = "fips", 
+                         treatment = "tr_ar", refinement.method = "mahalanobis", # use mahalanobis distance 
+                         data = disco_lag, match.missing = TRUE, 
+                         covs.formula = ~ turnout_l1 + perc_bl + pop_tot + income, 
+                         size.match = 5, qoi = "att" , outcome.var = "turnout",
+                         lead = 0:4, forbid.treatment.reversal = FALSE, 
+                         use.diagonal.variance.matrix = TRUE)
+
+PE.results_ar <- PanelEstimate(sets = PM.results_ar, data = disco_lag)
+
+PM.results_shnone <- PanelMatch(lag = 5, time.id = "year2", unit.id = "fips", 
+                         treatment = "tr_sh", refinement.method = "none", # use no refinement
+                         data = disco_lag, match.missing = TRUE, 
+                         covs.formula = ~ turnout_l1 + perc_bl + pop_tot + income + fatalities + injured, 
+                         size.match = 5, qoi = "att" , outcome.var = "turnout",
+                         lead = 0:4, forbid.treatment.reversal = FALSE, 
+                         use.diagonal.variance.matrix = TRUE)
+
+PM.results_sh <- PanelMatch(lag = 5, time.id = "year2", unit.id = "fips", 
+                         treatment = "tr_sh", refinement.method = "mahalanobis", # use mahalanobis distance 
+                         data = disco_lag, match.missing = TRUE, 
+                         covs.formula = ~ turnout_l1 + perc_bl + pop_tot + income + fatalities + injured, 
+                         size.match = 5, qoi = "att" , outcome.var = "turnout",
+                         lead = 0:4, forbid.treatment.reversal = FALSE, 
+                         use.diagonal.variance.matrix = TRUE)
+
+PE.results_sh <- PanelEstimate(sets = PM.results_sh, data = disco_lag)
+
+PM.results_natnone <- PanelMatch(lag = 5, time.id = "year2", unit.id = "fips", 
+                         treatment = "tr_dis2", refinement.method = "none", # use no refinement
+                         data = disco_lag, match.missing = TRUE, 
+                         covs.formula = ~ turnout_l1 + perc_bl + pop_tot + income, 
+                         size.match = 5, qoi = "att" , outcome.var = "turnout",
+                         lead = 0:4, forbid.treatment.reversal = FALSE, 
+                         use.diagonal.variance.matrix = TRUE)
+
+PM.results_nat <- PanelMatch(lag = 5, time.id = "year2", unit.id = "fips", 
+                         treatment = "tr_dis2", refinement.method = "mahalanobis", # use mahalanobis distance 
+                         data = disco_lag, match.missing = TRUE, 
+                         covs.formula = ~ turnout_l1 + perc_bl + pop_tot + income, 
+                         size.match = 5, qoi = "att" , outcome.var = "turnout",
+                         lead = 0:4, forbid.treatment.reversal = FALSE, 
+                         use.diagonal.variance.matrix = TRUE)
+
+PE.results_nat <- PanelEstimate(sets = PM.results_nat, data = disco_lag)
+
+summary(PE.results_ar)
+pan_p1 <- plot(PE.results_ar)
+
+summary(PE.results_sh)
+pan_p2 <- plot(PE.results_sh)
+
+summary(PE.results_nat)
+pan_p3 <- plot(PE.results_nat)
+
+get_covariate_balance(PM.results_arnone$att,
+                      data = disco_lag,
+                      covariates = c("perc_bl", "pop_tot", "income", "turnout"),
+                      plot = TRUE,
+                      ylim = c(-1, 1))
+
+get_covariate_balance(PM.results_shnone$att,
+                      data = disco_lag,
+                      covariates = c("perc_bl", "pop_tot", "income", "turnout", "fatalities", "injured"),
+                      plot = TRUE,
+                      ylim = c(-1, 1))
+
+get_covariate_balance(PM.results_natnone$att,
+                      data = disco_lag,
+                      covariates = c("perc_bl", "pop_tot", "income", "turnout"),
+                      plot = TRUE,
+                      ylim = c(-1, 1))
+
+get_covariate_balance(PM.results_ar$att,
+                      data = disco_lag,
+                      covariates = c("perc_bl", "pop_tot", "income", "turnout"),
+                      plot = TRUE,
+                      ylim = c(-.2, .2))
+
+get_covariate_balance(PM.results_sh$att,
+                      data = disco_lag,
+                      covariates = c("perc_bl", "pop_tot", "income", "turnout", "fatalities", "injured"),
+                      plot = TRUE,
+                      ylim = c(-.2, .2))
+
+get_covariate_balance(PM.results_nat$att,
+                      data = disco_lag,
+                      covariates = c("perc_bl", "pop_tot", "income", "turnout"),
+                      plot = TRUE,
+                      ylim = c(-.2, .2))
+
+
+balance_scatter(non_refined_set = PM.results_arnone$att,
+               refined_list = list(PM.results_ar$att),
+               data = disco_lag,
+              covariates = c("perc_bl", "pop_tot", "income", "turnout"))
+
+# FIXME: Error in balance_scatter(non_refined_set = PM.results_arnone$att, refined_list = list(PM.results_ar$att),  : 
+  #argument "matched_set_list" is missing, with no default
+
+balance_scatter(non_refined_set = PM.results_shnone$att,
+               refined_list = list(PM.results_sh$att),
+               data = disco_lag,
+              covariates = c("perc_bl", "pop_tot", "income", "turnout", "fatalities", "injured"))
+balance_scatter(non_refined_set = PM.results_natnone$att,
+               refined_list = list(PM.results_nat$att),
+               data = disco_lag,
+              covariates = c("perc_bl", "pop_tot", "income", "turnout"))
+
+```
+
+# Robustness Checks
+
+## Stanford Mass Shootings Dataset models
+
+```{r}
+
+stan2 <- stan2[!duplicated(stan2[c(1, 2)]),] # remove duplicate cases
+
+
+stsh_plm1 <- plm(turnout ~ tr_stsh + perc_bl + pop_tot.x + income +
+                  fatalities_st + victims_st, # with controls
+           data = stan2,
+           index = c('fips', 'year'),
+           model = 'within',
+           effect = 'twoways')
+coeftest(stsh_plm1, vcov = vcovHC, type = 'HC1') 
+coeftest(stsh_plm1, vcov = vcovHC(stsh_plm1, cluster = 'group')) # ~0.037 decrease, not sig.
+
+stan_lag <- DataCombine::slide(stan2, Var = "turnout", GroupVar = "fips",
+                             slideBy = -1, NewVar = "turnout_l1", reminder = FALSE)
+
+# arson
+
+stsh_lag1 <- lm(turnout ~ turnout_l1 + tr_stsh,
+              data = stan_lag)
+
+summary(stsh_lag1) # ~4.6% decrease is turnout when arson attack present
+coeftest(stsh_lag1, vcov = vcovHC, type = 'HC1') # ~0.038 decrease, not sig.
+
+```
+
+## Cross-Contamination Check
+
+```{r}
+
+# including all events in one model
+
+xc_lag1 <- lm(turnout ~ turnout_l1 + tr_ar + tr_sh + tr_dis2,
+              data = disco_lag)
+
+summary(xc_lag1)
+coeftest(xc_lag1, vcov = vcovHC, type = 'HC1')
+
+```
+
+# Individual-Level Analysis
+
+## CPS Temporal Proximity Effects Analysis
+
+### Two-Way Fixed Effects Models
+
+```{r}
+
+# arson
+
+ar_cps_3m <- felm(vote ~ el3m_ar*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(ar_cps_3m, robust = T)
+
+ar_cps_6m <- felm(vote ~ el6m_ar*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(ar_cps_6m, robust = T)
+
+ar_cps_yr <- felm(vote ~ elyr_ar*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(ar_cps_yr, robust = T)
+
+ar_cps_2yr <- felm(vote ~ el2_ar*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(ar_cps_2yr, robust = T)
+
+# shooting
+
+sh_cps_3m <- felm(vote ~ el3m_sh*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(sh_cps_3m, robust = T)
+
+sh_cps_6m <- felm(vote ~ el6m_sh*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(sh_cps_6m, robust = T)
+
+sh_cps_yr <- felm(vote ~ elyr_sh*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(sh_cps_yr, robust = T)
+
+sh_cps_2yr <- felm(vote ~ el2_sh*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(sh_cps_2yr, robust = T)
+
+# natural disaster
+
+dis_cps_3m <- felm(vote ~ el3m_dis2*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(dis_cps_3m, robust = T)
+
+dis_cps_6m <- felm(vote ~ el6m_dis2*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(dis_cps_6m, robust = T)
+
+dis_cps_yr <- felm(vote ~ elyr_dis2*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(dis_cps_yr, robust = T)
+
+dis_cps_2yr <- felm(vote ~ el2_dis2*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(dis_cps_2yr, robust = T)
+
+```
+
+### Lagged DV Models
+
+```{r}
+
+# arson
+
+ar_cpsl_3m <- lm(vote ~ vote_l1 + el3m_ar*black + gender + edu + income,
+              data = cps_lag)
+
+summary(ar_cpsl_3m)
+coeftest(ar_cpsl_3m, vcov = vcovHC, type = 'HC1')
+
+ar_cpsl_6m <- lm(vote ~ vote_l1 + el6m_ar*black + gender + edu + income,
+              data = cps_lag)
+
+summary(ar_cpsl_6m)
+coeftest(ar_cpsl_6m, vcov = vcovHC, type = 'HC1')
+
+ar_cpsl_yr <- lm(vote ~ vote_l1 + elyr_ar*black + gender + edu + income,
+              data = cps_lag)
+
+summary(ar_cpsl_yr)
+coeftest(ar_cpsl_yr, vcov = vcovHC, type = 'HC1')
+
+ar_cpsl_2yr <- lm(vote ~ vote_l1 + el2_ar*black + gender + edu + income,
+              data = cps_lag)
+
+summary(ar_cpsl_2yr)
+coeftest(ar_cpsl_2yr, vcov = vcovHC, type = 'HC1')
+
+# shooting
+
+sh_cpsl_3m <- lm(vote ~ vote_l1 + el3m_sh*black + gender + edu + income,
+              data = cps_lag)
+
+summary(sh_cpsl_3m)
+coeftest(sh_cpsl_3m, vcov = vcovHC, type = 'HC1')
+
+sh_cpsl_6m <- lm(vote ~ vote_l1 + el6m_sh*black + gender + edu + income,
+              data = cps_lag)
+
+summary(sh_cpsl_6m)
+coeftest(sh_cpsl_6m, vcov = vcovHC, type = 'HC1')
+
+sh_cpsl_yr <- lm(vote ~ vote_l1 + elyr_sh*black + gender + edu + income,
+              data = cps_lag)
+
+summary(sh_cpsl_yr)
+coeftest(sh_cpsl_yr, vcov = vcovHC, type = 'HC1')
+
+sh_cpsl_2yr <- lm(vote ~ vote_l1 + el2_sh*black + gender + edu + income,
+              data = cps_lag)
+
+summary(sh_cpsl_2yr)
+coeftest(sh_cpsl_2yr, vcov = vcovHC, type = 'HC1')
+
+# natural disaster
+
+dis_cpsl_3m <- lm(vote ~ vote_l1 + el3m_dis2*black + gender + edu + income,
+              data = cps_lag)
+
+summary(dis_cpsl_3m)
+coeftest(dis_cpsl_3m, vcov = vcovHC, type = 'HC1')
+
+dis_cpsl_6m <- lm(vote ~ vote_l1 + el6m_dis2*black + gender + edu + income,
+              data = cps_lag)
+
+summary(dis_cpsl_6m)
+coeftest(dis_cpsl_6m, vcov = vcovHC, type = 'HC1')
+
+dis_cpsl_yr <- lm(vote ~ vote_l1 + elyr_dis2*black + gender + edu + income,
+              data = cps_lag)
+
+summary(dis_cpsl_yr)
+coeftest(dis_cpsl_yr, vcov = vcovHC, type = 'HC1')
+
+dis_cpsl_2yr <- lm(vote ~ vote_l1 + el2_dis2*black + gender + edu + income,
+              data = cps_lag)
+
+summary(dis_cpsl_2yr)
+coeftest(dis_cpsl_2yr, vcov = vcovHC, type = 'HC1')
+
+
+```
+
+### Figures
+
+```{r}
+
+## arsons 
+
+beta.hat <- coef(ar_cps_3m)
+vcov1 <- vcov(ar_cps_3m)
+z0 <- seq(0, 1, by = 1)
+dy.dx <- beta.hat["el3m_ar"] + beta.hat["el3m_ar:black"]*z0
+se.dy.dx <- sqrt(vcov1["el3m_ar", "el3m_ar"] + (z0^2)*vcov1["black", "black"] + 2*z0*vcov1["el3m_ar", "black"])
+upr <- dy.dx + 1.96*se.dy.dx
+lwr <- dy.dx - 1.96*se.dy.dx
+
+beta.hat2 <- coef(ar_cps_6m)
+vcov2 <- vcov(ar_cps_6m)
+dy.dx2 <- beta.hat2["el6m_ar"] + beta.hat2["el6m_ar:black"]*z0
+se.dy.dx2 <- sqrt(vcov2["el6m_ar", "el6m_ar"] + (z0^2)*vcov2["black", "black"] + 2*z0*vcov2["el6m_ar", "black"])
+upr2 <- dy.dx2 + 1.96*se.dy.dx2
+lwr2 <- dy.dx2 - 1.96*se.dy.dx2
+
+beta.hat3 <- coef(ar_cps_yr)
+vcov3 <- vcov(ar_cps_yr)
+dy.dx3 <- beta.hat3["elyr_ar"] + beta.hat3["elyr_ar:black"]*z0
+se.dy.dx3 <- sqrt(vcov3["elyr_ar", "elyr_ar"] + (z0^2)*vcov3["black", "black"] + 2*z0*vcov3["elyr_ar", "black"])
+upr3 <- dy.dx3 + 1.96*se.dy.dx3
+lwr3 <- dy.dx3 - 1.96*se.dy.dx3
+
+beta.hat4 <- coef(ar_cps_2yr)
+vcov4 <- vcov(ar_cps_2yr)
+dy.dx4 <- beta.hat4["el2_ar"] + beta.hat4["el2_ar:black"]*z0
+se.dy.dx4 <- sqrt(vcov4["el2_ar", "el2_ar"] + (z0^2)*vcov4["black", "black"] + 2*z0*vcov4["el2_ar", "black"])
+upr4 <- dy.dx4 + 1.96*se.dy.dx4
+lwr4 <- dy.dx4 - 1.96*se.dy.dx4
+
+ar_cps_time <- as.data.frame(rbind(cbind(z0, dy.dx, upr, lwr),
+                                   cbind(z0, dy.dx2, upr2, lwr2),
+                                   cbind(z0, dy.dx3, upr3, lwr3),
+                                   cbind(z0, dy.dx4, upr4, lwr4)))
+ar_cps_time$time <- c('aThree Months', 'aThree Months',
+                      'bSix Months', 'bSix Months',
+                      'cElection Year', 'cElection Year',
+                      'dTwo Years','dTwo Years')
+ar_cps_time$race <- c('Non-Black', 'Black',
+                      'Non-Black', 'Black',
+                      'Non-Black', 'Black',
+                      'Non-Black', 'Black')
+
+
+
+cps_time_p1 <- ggplot(ar_cps_time, aes(shape = race)) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = time, y = dy.dx, ymin = lwr,
+                         ymax = upr, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  #xlim(-0.5, 1.5) +
+  scale_shape_manual(name = 'Racial Identity',
+                    labels = c('Black', 'Non-Black'),
+                    values = c(21, 22)) +
+  scale_x_discrete(name = 'Temporal Proximity',
+                   labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+  ylab("Marginal Effects") +
+  labs(title = 'Marginal Effect of Black Social Identity on Effect of \nBlack Church Arson Attacks on Turnout, by Temporal Proximity',
+       caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing a Black Church Arson attack within the county \nof residence for respondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way \nfixed effects model and error bars respresent 95% confidence intervals. Full results in table 36 in the SI.') +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(text=element_text(size = 10, family="serif"))
+
+## Mass Shootings
+
+beta.hat <- coef(sh_cps_3m)
+vcov1 <- vcov(sh_cps_3m)
+z0 <- seq(0, 1, by = 1)
+dy.dx <- beta.hat["el3m_sh"] + beta.hat["el3m_sh:black"]*z0
+se.dy.dx <- sqrt(vcov1["el3m_sh", "el3m_sh"] + (z0^2)*vcov1["black", "black"] + 2*z0*vcov1["el3m_sh", "black"])
+upr <- dy.dx + 1.96*se.dy.dx
+lwr <- dy.dx - 1.96*se.dy.dx
+
+beta.hat2 <- coef(sh_cps_6m)
+vcov2 <- vcov(sh_cps_6m)
+dy.dx2 <- beta.hat2["el6m_sh"] + beta.hat2["el6m_sh:black"]*z0
+se.dy.dx2 <- sqrt(vcov2["el6m_sh", "el6m_sh"] + (z0^2)*vcov2["black", "black"] + 2*z0*vcov2["el6m_sh", "black"])
+upr2 <- dy.dx2 + 1.96*se.dy.dx2
+lwr2 <- dy.dx2 - 1.96*se.dy.dx2
+
+beta.hat3 <- coef(sh_cps_yr)
+vcov3 <- vcov(sh_cps_yr)
+dy.dx3 <- beta.hat3["elyr_sh"] + beta.hat3["elyr_sh:black"]*z0
+se.dy.dx3 <- sqrt(vcov3["elyr_sh", "elyr_sh"] + (z0^2)*vcov3["black", "black"] + 2*z0*vcov3["elyr_sh", "black"])
+upr3 <- dy.dx3 + 1.96*se.dy.dx3
+lwr3 <- dy.dx3 - 1.96*se.dy.dx3
+
+beta.hat4 <- coef(sh_cps_2yr)
+vcov4 <- vcov(sh_cps_2yr)
+dy.dx4 <- beta.hat4["el2_sh"] + beta.hat4["el2_sh:black"]*z0
+se.dy.dx4 <- sqrt(vcov4["el2_sh", "el2_sh"] + (z0^2)*vcov4["black", "black"] + 2*z0*vcov4["el2_sh", "black"])
+upr4 <- dy.dx4 + 1.96*se.dy.dx4
+lwr4 <- dy.dx4 - 1.96*se.dy.dx4
+
+sh_cps_time <- as.data.frame(rbind(cbind(z0, dy.dx, upr, lwr),
+                                   cbind(z0, dy.dx2, upr2, lwr2),
+                                   cbind(z0, dy.dx3, upr3, lwr3),
+                                   cbind(z0, dy.dx4, upr4, lwr4)))
+sh_cps_time$time <- c('aThree Months', 'aThree Months',
+                      'bSix Months', 'bSix Months',
+                      'cElection Year', 'cElection Year',
+                      'dTwo Years','dTwo Years')
+sh_cps_time$race <- c('Non-Black', 'Black',
+                      'Non-Black', 'Black',
+                      'Non-Black', 'Black',
+                      'Non-Black', 'Black')
+
+
+
+cps_time_p2 <- ggplot(sh_cps_time, aes(shape = race)) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = time, y = dy.dx, ymin = lwr,
+                         ymax = upr, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  #xlim(-0.5, 1.5) +
+  scale_shape_manual(name = 'Racial Identity',
+                    labels = c('Black', 'Non-Black'),
+                    values = c(21, 22)) +
+  scale_x_discrete(name = 'Temporal Proximity',
+                   labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+  ylab("Marginal Effects") +
+  labs(title = 'Marginal Effect of Black Social Identity on Effect of \nMass Shootings on Turnout, by Temporal Proximity',
+       caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing a mass shooting within the county of residence \nfor respondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects \nmodel and error bars respresent 95% confidence intervals. Full results in table 38 in the SI.') +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(text=element_text(size = 10, family="serif"))
+
+## Natural Disasters
+
+beta.hat <- coef(dis_cps_3m)
+vcov1 <- vcov(dis_cps_3m)
+z0 <- seq(0, 1, by = 1)
+dy.dx <- beta.hat["el3m_dis2"] + beta.hat["el3m_dis2:black"]*z0
+se.dy.dx <- sqrt(vcov1["el3m_dis2", "el3m_dis2"] + (z0^2)*vcov1["black", "black"] + 2*z0*vcov1["el3m_dis2", "black"])
+upr <- dy.dx + 1.96*se.dy.dx
+lwr <- dy.dx - 1.96*se.dy.dx
+
+beta.hat2 <- coef(dis_cps_6m)
+vcov2 <- vcov(dis_cps_6m)
+dy.dx2 <- beta.hat2["el6m_dis2"] + beta.hat2["el6m_dis2:black"]*z0
+se.dy.dx2 <- sqrt(vcov2["el6m_dis2", "el6m_dis2"] + (z0^2)*vcov2["black", "black"] + 2*z0*vcov2["el6m_dis2", "black"])
+upr2 <- dy.dx2 + 1.96*se.dy.dx2
+lwr2 <- dy.dx2 - 1.96*se.dy.dx2
+
+beta.hat3 <- coef(dis_cps_yr)
+vcov3 <- vcov(dis_cps_yr)
+dy.dx3 <- beta.hat3["elyr_dis2"] + beta.hat3["elyr_dis2:black"]*z0
+se.dy.dx3 <- sqrt(vcov3["elyr_dis2", "elyr_dis2"] + (z0^2)*vcov3["black", "black"] + 2*z0*vcov3["elyr_dis2", "black"])
+upr3 <- dy.dx3 + 1.96*se.dy.dx3
+lwr3 <- dy.dx3 - 1.96*se.dy.dx3
+
+beta.hat4 <- coef(dis_cps_2yr)
+vcov4 <- vcov(dis_cps_2yr)
+dy.dx4 <- beta.hat4["el2_dis2"] + beta.hat4["el2_dis2:black"]*z0
+se.dy.dx4 <- sqrt(vcov4["el2_dis2", "el2_dis2"] + (z0^2)*vcov4["black", "black"] + 2*z0*vcov4["el2_dis2", "black"])
+upr4 <- dy.dx4 + 1.96*se.dy.dx4
+lwr4 <- dy.dx4 - 1.96*se.dy.dx4
+
+dis_cps_time <- as.data.frame(rbind(cbind(z0, dy.dx, upr, lwr),
+                                   cbind(z0, dy.dx2, upr2, lwr2),
+                                   cbind(z0, dy.dx3, upr3, lwr3),
+                                   cbind(z0, dy.dx4, upr4, lwr4)))
+dis_cps_time$time <- c('Three Months', 'Three Months',
+                      'Six Months', 'Six Months',
+                      'Election Year', 'Election Year',
+                      'Two Years','Two Years')
+dis_cps_time$race <- c('Non-Black', 'Black',
+                      'Non-Black', 'Black',
+                      'Non-Black', 'Black',
+                      'Non-Black', 'Black')
+
+
+
+cps_time_p3 <- ggplot(dis_cps_time, aes(shape = race)) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = time, y = dy.dx, ymin = lwr,
+                         ymax = upr, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  scale_shape_manual(name = 'Racial Identity',
+                    labels = c('Black', 'Non-Black'),
+                    values = c(21, 22)) +
+  scale_x_discrete(name = 'Temporal Proximity',
+                   labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+  ylab("Marginal Effects") +
+  labs(title = 'Marginal Effect of Black Social Identity on Effect of \nNatural Disasters on Turnout, by Temporal Proximity',
+       caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing a natural disaster within the county of residence \nfor respondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects \nmodel and error bars respresent 95% confidence intervals. Full results in table 40 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(text=element_text(size = 10, family="serif"))
+
+
+type <- c(rep('Arson', 4), rep('Mass Shooting', 4), rep('Natural Disasters', 4))
+time <- rep(c('aThree Months', 'bSix Months', 'cElection Year', 'dTwo Years'), 3)
+
+did <- as.data.frame(cbind(type, time))
+did$coef <- c(ar_3m[[1]], ar_6m[[1]], ar_yr[[1]], ar_2yr[[1]],
+              sh_3m[[1]], sh_6m[[1]], sh_yr[[1]], sh_2yr[[1]],
+              nat_3m[[1]], nat_6m[[1]], nat_yr[[1]], nat_2yr[[1]])
+did$lo <- c(ar_3m[[1]] - ar_3m[[5]], ar_6m[[1]] - ar_6m[[5]],
+               ar_yr[[1]] - ar_yr[[5]], ar_2yr[[1]] - ar_2yr[[5]],
+            sh_3m[[1]] - sh_3m[[7]], sh_6m[[1]] - sh_6m[[7]],
+               sh_yr[[1]] - sh_yr[[7]], sh_2yr[[1]] - sh_2yr[[7]],
+            nat_3m[[1]] - nat_3m[[5]], nat_6m[[1]] - nat_6m[[5]],
+               nat_yr[[1]] - nat_yr[[5]], nat_2yr[[1]] - nat_2yr[[5]])
+did$hi <- c(ar_3m[[1]] + ar_3m[[5]], ar_6m[[1]] + ar_6m[[5]],
+               ar_yr[[1]] + ar_yr[[5]], ar_2yr[[1]] + ar_2yr[[5]],
+            sh_3m[[1]] + sh_3m[[7]], sh_6m[[1]] + sh_6m[[7]],
+               sh_yr[[1]] + sh_yr[[7]], sh_2yr[[1]] + sh_2yr[[7]],
+            nat_3m[[1]] + nat_3m[[5]], nat_6m[[1]] + nat_6m[[5]],
+               nat_yr[[1]] + nat_yr[[5]], nat_2yr[[1]] + nat_2yr[[5]])
+
+did_p <- ggplot(did, aes(shape = type)) +
+      theme_bw() +
+      geom_hline(yintercept = 0, colour = gray(1/2), lty = 2) +
+      geom_pointrange(aes(x = time, y = coef*100, ymin = lo*100,
+                         ymax = hi*100, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+    scale_x_discrete(labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+    scale_shape_manual(name = 'Event Type', labels = c('Arson', 'Mass Shooting', 'Natural Disasters'), values=c(21, 22, 23)) +
+    ylim(-8, 7.5) + ylab('Percentage Point Change in Turnout') + xlab('') +
+    theme(axis.text=element_text(size = 12)) + 
+    theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+
+lag.df <- as.data.frame(cbind(type, time))
+lag.df$coef <- c(arl_3m[[3]], arl_6m[[3]], arl_yr[[3]], arl_2yr[[3]],
+              shl_3m[[3]], shl_6m[[3]], shl_yr[[3]], shl_2yr[[3]],
+              natl_3m[[3]], natl_6m[[3]], natl_yr[[3]], natl_2yr[[3]])
+lag.df$lo <- c(arl_3m[[3]] - arl_3m[[6]], arl_6m[[3]] - arl_6m[[6]],
+               arl_yr[[3]] - arl_yr[[6]], arl_2yr[[3]] - arl_2yr[[6]],
+            shl_3m[[3]] - shl_3m[[8]], shl_6m[[3]] - shl_6m[[8]],
+               shl_yr[[3]] - shl_yr[[8]], shl_2yr[[3]] - shl_2yr[[8]],
+            natl_3m[[3]] - natl_3m[[6]], natl_6m[[3]] - natl_6m[[6]],
+               natl_yr[[3]] - natl_yr[[6]], natl_2yr[[3]] - natl_2yr[[6]])
+lag.df$hi <- c(arl_3m[[3]] + arl_3m[[6]], arl_6m[[3]] + arl_6m[[6]],
+               arl_yr[[3]] + arl_yr[[6]], arl_2yr[[3]] + arl_2yr[[6]],
+            shl_3m[[3]] + shl_3m[[8]], shl_6m[[3]] + shl_6m[[8]],
+               shl_yr[[3]] + shl_yr[[8]], shl_2yr[[3]] + shl_2yr[[8]],
+            natl_3m[[3]] + natl_3m[[6]], natl_6m[[3]] + natl_6m[[6]],
+               natl_yr[[3]] + natl_yr[[6]], natl_2yr[[3]] + natl_2yr[[6]])
+
+lag_p <- ggplot(lag.df, aes(shape = type)) +
+      theme_bw() +
+      geom_hline(yintercept = 0, colour = gray(1/2), lty = 2) +
+      geom_pointrange(aes(x = time, y = coef*100, ymin = lo*100,
+                         ymax = hi*100, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+    scale_x_discrete(labels = c('Three Months', 'Six Months', 'Election Year', 'Two Years')) +
+    scale_shape_manual(name = 'Event Type', labels = c('Arson', 'Mass Shooting', 'Natural Disasters'), values=c(21, 22, 23)) +
+    ylim(-8, 7.7) + ylab('Percentage Point Change in Turnout') + xlab('') +
+    theme(axis.text=element_text(size = 12)) + 
+    theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+```
+
+## Racial Identity Effects Analysis
+
+### Lagged DV
+
+```{r}
+
+cps_lag1 <- lm(vote ~ vote_l1 + tr_ar*black,
+              data = cps_lag)
+
+summary(cps_lag1)
+coeftest(cps_lag1, vcov = vcovHC, type = 'HC1')
+
+cps_lag2 <- lm(vote ~ vote_l1 + tr_ar*black + gender + edu + income,
+              data = cps_lag)
+
+summary(cps_lag2)
+coeftest(cps_lag2, vcov = vcovHC, type = 'HC1')
+
+cps_lag3 <- lm(vote ~ vote_l1 + tr_dis2*black + gender + edu + income,
+              data = cps_lag)
+
+summary(cps_lag3)
+coeftest(cps_lag3, vcov = vcovHC, type = 'HC1')
+
+
+cps_lag_sima_dis <- lm(vote ~ vote_l1 + sima_dis*black + gender + edu + income,
+              data = cps_lag)
+
+summary(cps_lag_sima_dis)
+coeftest(cps_lag_sima_dis, vcov = vcovHC, type = 'HC1')
+
+cps_lag_sh <- lm(vote ~ vote_l1 + tr_sh*black + gender + edu + income,
+              data = cps_lag)
+
+summary(cps_lag_sh)
+coeftest(cps_lag_sh, vcov = vcovHC, type = 'HC1')
+
+cps_lag_sima_sh <- lm(vote ~ vote_l1 + sima_sh*black + gender + edu + income,
+              data = cps_lag)
+
+summary(cps_lag_sima_sh)
+coeftest(cps_lag_sima_sh, vcov = vcovHC, type = 'HC1')
+
+cps_lag_gen_ar <- lm(vote ~ vote_l1 + tr_ar*gender + black + edu + income,
+              data = cps_lag)
+
+summary(cps_lag_gen_ar)
+coeftest(cps_lag_gen_ar, vcov = vcovHC, type = 'HC1')
+
+cps_lag_inc_ar <- lm(vote ~ vote_l1 + tr_ar*income + black + gender + edu,
+              data = cps_lag)
+
+summary(cps_lag_inc_ar)
+coeftest(cps_lag_inc_ar, vcov = vcovHC, type = 'HC1')
+
+cps_lag_edu_ar <- lm(vote ~ vote_l1 + tr_ar*edu + black + gender + income,
+              data = cps_lag)
+
+summary(cps_lag_edu_ar)
+coeftest(cps_lag_edu_ar, vcov = vcovHC, type = 'HC1')
+
+## Subset models
+
+cps_lag_bl <- lm(vote ~ vote_l1 + tr_ar + gender + edu + income,
+              data = subset(cps_lag, black == 1))
+
+summary(cps_lag_bl)
+coeftest(cps_lag_bl, vcov = vcovHC, type = 'HC1')
+
+cps_lag_wh <- lm(vote ~ vote_l1 + tr_ar + gender + edu + income,
+              data = subset(cps_lag, black == 0))
+
+summary(cps_lag_wh)
+coeftest(cps_lag_wh, vcov = vcovHC, type = 'HC1')
+
+cps_lag_bl2 <- lm(vote ~ vote_l1 + sima_dis + gender + edu + income,
+              data = subset(cps_lag, black == 1))
+
+summary(cps_lag_bl2)
+coeftest(cps_lag_bl2, vcov = vcovHC, type = 'HC1')
+
+cps_lag_wh2 <- lm(vote ~ vote_l1 + sima_dis + gender + edu + income,
+              data = subset(cps_lag, black == 0))
+
+summary(cps_lag_wh2)
+coeftest(cps_lag_wh2, vcov = vcovHC, type = 'HC1')
+
+cps_did_bl <- felm(vote ~ tr_ar + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = subset(cps3, black == 1), exactDOF = TRUE)
+summary(cps_did_bl, robust = T)
+
+cps_did_wh <- felm(vote ~ tr_ar + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = subset(cps3, black == 0), exactDOF = TRUE)
+summary(cps_did_wh, robust = T)
+
+cps_did_bl2 <- felm(vote ~ sima_dis + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = subset(cps3, black == 1), exactDOF = TRUE)
+summary(cps_did_bl2, robust = T)
+
+cps_did_wh2 <- felm(vote ~ sima_dis + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = subset(cps3, black == 0), exactDOF = TRUE)
+summary(cps_did_wh2, robust = T)
+
+## Double lagged models
+
+cps_2lag2 <- lm(vote ~ vote_l1 + vote_l2 + tr_ar*black + gender + edu + income,
+              data = cps_2lag)
+
+summary(cps_2lag2)
+coeftest(cps_2lag2, vcov = vcovHC, type = 'HC1')
+
+cps_2lag3 <- lm(vote ~ vote_l1 + vote_l2 + sima_dis*black + gender + edu + income,
+              data = cps_2lag)
+
+summary(cps_2lag3)
+coeftest(cps_2lag3, vcov = vcovHC, type = 'HC1')
+
+```
+
+###Two-Way Fixed Effects Analysis
+
+```{r}
+
+cps_did1 <- felm(vote ~ tr_ar*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did1, robust = T)
+
+cps_did2 <- felm(vote ~ tr_sh*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did2, robust = T)
+
+cps_did3 <- felm(vote ~ tr_dis2*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did3, robust = T)
+
+cps_did_sima_dis <- felm(vote ~ sima_dis*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_sima_dis, robust = T)
+
+cps_did_sima_sh <- felm(vote ~ sima_sh*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_sima_sh, robust = T)
+
+## total sima effect
+
+cps3$sima <- ifelse(cps3$sima_dis == 1 | cps3$tr_ar == 1, 1, 0)
+
+cps_did_sima <- felm(vote ~ sima*black + gender + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_sima, robust = T)
+
+## other social IDs
+
+cps_did_gen <- felm(vote ~ tr_ar*gender + black + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_gen, robust = T)
+
+cps_did_gen2 <- felm(vote ~ tr_sh*gender + black + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_gen2, robust = T)
+
+cps_did_gen3 <- felm(vote ~ tr_dis2*gender + black + edu + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_gen3, robust = T)
+
+cps_did_inc <- felm(vote ~ tr_ar*income + black + gender + edu |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_inc, robust = T)
+
+cps_did_inc1 <- felm(vote ~ tr_ar*income*black + gender + edu |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_inc1, robust = T)
+
+cps_did_inc2 <- felm(vote ~ tr_sh*income + black + gender + edu |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_inc2, robust = T)
+
+cps_did_inc3 <- felm(vote ~ tr_dis2*income + black + gender + edu |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_inc3, robust = T)
+
+cps_did_edu <- felm(vote ~ tr_ar*edu + black + gender + income |
+                            fips + YEAR | 
+                            0 |
+                            fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did_edu, robust = T)
+
+```
+
+## Multiple Imputation
+
+```{r
+# To address vector memory limit issues:
+# Open terminal and enter
+# cd ~
+#   touch .Renviron
+#   open .Renviron
+#   
+# Save the below line as the first line of the .Renviron
+# R_MAX_VSIZE=100Gb
+# (value of Gb may need to be changed depending on computer's memory size)
+
+library(glmmML)
+
+cps_did2_mi <- glmmML(vote ~ tr_ar*black + gender + edu + income + factor(YEAR) - 1,
+                   cluster = fips, data = cps3)
+
+cps_did2_se <- glmmboot(vote ~ tr_ar*black + gender + edu + income + factor(YEAR) - 1, family = binomial,
+                   cluster = fips, data = cps3, boot = 10)
+
+cps_mi1 <- as.data.frame(cps3[, c('vote', 'tr_ar', 'tr_sh', 'sima_sh', 'tr_dis2', 'sima_dis', 'black', 'gender', 'edu', 'income',  'fips', 'YEAR')])
+
+# Run Amelia
+cps_mi2 <- amelia(cps_mi1)
+
+# Examine imputed data
+head(cps_mi2$imputations[[1]], n = 35)
+head(cps_mi2$imputations[[2]], n = 35)
+
+# Check with overimputation
+#overimpute(cps_mi2, var = "edu")
+
+# Estimate model with CWD
+
+## DiD
+
+# cps_did1 <- felm(vote ~ tr_ar*black + gender + edu + income |
+#                             fips + YEAR | 
+#                             0 |
+#                             fips + YEAR, data = cps3, exactDOF = TRUE)
+summary(cps_did1, robust = T)
+
+
+
+# Estimate model with Amelia (joint modeling)
+
+## All Black Church arsons
+
+mi_1 <- zelig(vote ~ tr_ar + black + gender + edu + income + tr_ar*black +
+                as.factor(YEAR), model = 'ls', data = cps_mi2$imputations, by = 'fips', cite = F)
+
+summary(mi_1)
+
+# all mass shootings
+
+mi_2 <- zelig(vote ~ tr_sh + black + gender + edu + income + tr_sh*black +
+                as.factor(YEAR), model = 'ls', data = cps_mi2$imputations, by = 'fips', cite = F)
+
+summary(mi_2)
+
+## All natural disasters
+
+mi_3 <- zelig(vote ~ tr_dis2 + black + gender + edu + income + tr_dis2*black +
+                as.factor(YEAR), model = 'ls', data = cps_mi2$imputations, by = 'fips', cite = F)
+
+summary(mi_3)
+
+## Hurricane Katrina
+
+mi_4 <- zelig(vote ~ sima_dis + black + gender + edu + income + sima_dis*black +
+                as.factor(YEAR), model = 'ls', data = cps_mi2$imputations, by = 'fips', cite = F)
+
+summary(mi_4)
+
+## racialized mass shootings
+
+mi_5 <- zelig(vote ~ sima_sh + black + gender + edu + income + sima_sh*black +
+                as.factor(YEAR), model = 'ls', data = cps_mi2$imputations, by = 'fips', cite = F)
+
+summary(mi_5)
+
+```
+
+## Descriptives
+
+```{r}
+
+cps3 %>%
+  group_by(YEAR) %>%
+  summarise_each(funs(mean(., na.rm = T), sd(., na.rm = T)))
+
+cps3 %>%
+  summarise_each(funs(mean(., na.rm = T), sd(., na.rm = T)))
+
+discop2 <- discop %>%
+  select('year', 'turnout', 'tr_ar', 'tr_sh', 'tr_dis2', 'perc_bl', 'pop_tot', 'income', 'fatalities', 'injured')
+
+discop2 %>%
+  group_by(year) %>%
+  summarise_each(funs(mean(., na.rm = T), sd(., na.rm = T)))
+
+discop2 %>%
+  summarise_each(funs(mean(., na.rm = T), sd(., na.rm = T)))
+
+```
+
+## Plotting CPS Interactions
+
+```{r}
+
+beta.hat <- coef(cps_did1)
+vcov1 <- vcov(cps_did1)
+z0 <- seq(0, 1, by = 1)
+dy.dx <- beta.hat["tr_ar"] + beta.hat["tr_ar:black"]*z0
+se.dy.dx <- sqrt(vcov1["tr_ar", "tr_ar"] + (z0^2)*vcov1["black", "black"] + 2*z0*vcov1["tr_ar", "black"])
+upr <- dy.dx + 1.96*se.dy.dx
+lwr <- dy.dx - 1.96*se.dy.dx
+
+cps_p <- ggplot(data=NULL, aes(x=z0, y=dy.dx)) +
+  theme_bw() +
+  ylab("Marginal Effects") +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = z0, y = dy.dx, ymin = lwr,
+                         ymax = upr, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  xlim(-0.5, 1.5) +
+  scale_x_continuous(name = 'Racial Identity',
+                    breaks = c(-0.5, 0, 0.5, 1, 1.5),
+                    labels = c('', 'Non-Black', '', 'Black', '')) +
+  labs(caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing a Black Church arson within the county of residence for \nrespondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects model and \nerror bars respresent 95% confidence intervals. Full results in table 9 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+## Mass Shootings
+
+beta.hat2 <- coef(cps_did2)
+vcov12 <- vcov(cps_did2)
+dy.dx2 <- beta.hat2["tr_sh"] + beta.hat2["tr_sh:black"]*z0
+se.dy.dx2 <- sqrt(vcov12["tr_sh", "tr_sh"] + (z0^2)*vcov12["black", "black"] + 2*z0*vcov12["tr_sh", "black"])
+upr2 <- dy.dx2 + 1.96*se.dy.dx2
+lwr2 <- dy.dx2 - 1.96*se.dy.dx2
+
+cps_p2 <- ggplot(data=NULL, aes(x=z0, y=dy.dx2)) +
+  theme_bw() +
+  ylab("Marginal Effects") +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = z0, y = dy.dx2, ymin = lwr2,
+                         ymax = upr2, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  xlim(-0.5, 1.5) +
+  scale_x_continuous(name = 'Racial Identity',
+                    breaks = c(-0.5, 0, 0.5, 1, 1.5),
+                    labels = c('', 'Non-Black', '', 'Black', '')) +
+  labs(caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing a mass shooting within the county of residence for \nrespondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects model and \nerror bars respresent 95% confidence intervals. Full results in table 10 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+## Natural Disasters
+
+beta.hat3 <- coef(cps_did3)
+vcov13 <- vcov(cps_did3)
+dy.dx3 <- beta.hat3["tr_dis2"] + beta.hat3["tr_dis2:black"]*z0
+se.dy.dx3 <- sqrt(vcov13["tr_dis2", "tr_dis2"] + (z0^2)*vcov13["black", "black"] + 2*z0*vcov13["tr_dis2", "black"])
+upr3 <- dy.dx3 + 1.96*se.dy.dx3
+lwr3 <- dy.dx3 - 1.96*se.dy.dx3
+
+cps_p3 <- ggplot(data=NULL, aes(x=z0, y=dy.dx3)) +
+  theme_bw() +
+  ylab("Marginal Effects") +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = z0, y = dy.dx3, ymin = lwr3,
+                         ymax = upr3, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  xlim(-0.5, 1.5) +
+  scale_x_continuous(name = 'Racial Identity',
+                    breaks = c(-0.5, 0, 0.5, 1, 1.5),
+                    labels = c('', 'Non-Black', '', 'Black', '')) +
+  labs(caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing a natural disaster within the county of residence for \nrespondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects model and \nerror bars respresent 95% confidence intervals. Full results in table 12 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+beta.hat4 <- coef(cps_did_sima_dis)
+vcov14 <- vcov(cps_did_sima_dis)
+dy.dx4 <- beta.hat4["sima_dis"] + beta.hat4["sima_dis:black"]*z0
+se.dy.dx4 <- sqrt(vcov14["sima_dis", "sima_dis"] + (z0^2)*vcov14["black", "black"] + 2*z0*vcov14["sima_dis", "black"])
+upr4 <- dy.dx4 + 1.96*se.dy.dx4
+lwr4 <- dy.dx4 - 1.96*se.dy.dx4
+
+cps_p4 <- ggplot(data=NULL, aes(x=z0, y=dy.dx4)) +
+  theme_bw() +
+  ylab("Marginal Effects") +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = z0, y = dy.dx4, ymin = lwr4,
+                         ymax = upr4, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  xlim(-0.5, 1.5) +
+  scale_x_continuous(name = 'Racial Identity',
+                    breaks = c(-0.5, 0, 0.5, 1, 1.5),
+                    labels = c('', 'Non-Black', '', 'Black', '')) +
+  labs(caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing Hurricane Katrina within the county of residence for \nrespondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects model and \nerror bars respresent 95% confidence intervals. Full results in table 13 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+beta.hat5 <- coef(cps_did_sima_sh)
+vcov15 <- vcov(cps_did_sima_sh)
+dy.dx5 <- beta.hat5["sima_sh"] + beta.hat5["sima_sh:black"]*z0
+se.dy.dx5 <- sqrt(vcov15["sima_sh", "sima_sh"] + (z0^2)*vcov15["black", "black"] + 2*z0*vcov15["sima_sh", "black"])
+upr5 <- dy.dx5 + 1.96*se.dy.dx5
+lwr5 <- dy.dx5 - 1.96*se.dy.dx5
+
+cps_p5 <- ggplot(data=NULL, aes(x=z0, y=dy.dx5)) +
+  theme_bw() +
+  ylab("Marginal Effects") +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_pointrange(aes(x = z0, y = dy.dx5, ymin = lwr5,
+                         ymax = upr5, fatten = 2, size = 5),
+                     lwd = 1, position = position_dodge(width = 1), fill = 'WHITE') +
+  xlim(-0.5, 1.5) +
+  scale_x_continuous(name = 'Racial Identity',
+                    breaks = c(-0.5, 0, 0.5, 1, 1.5),
+                    labels = c('', 'Non-Black', '', 'Black', '')) +
+  labs(caption = '\nNote: The plot presents the marginal effect of Black racial identity on the effect of experiencing racialized mass shootings within the county of residence \nfor respondents to the Current Population Survey (CPS) 1992-2016. Point estimates are the coefficient estimates from a two-way fixed effects model and \nerror bars respresent 95% confidence intervals. Full results in table 11 in the SI.') +
+  theme(plot.caption = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size = 12)) + 
+  theme(plot.title = element_text(hjust = 0.5)) + theme(text=element_text(size = 10, family="serif"))
+
+cps_p; cps_p2; cps_p3; cps_p4
+
+```
+
+
+
+
+
